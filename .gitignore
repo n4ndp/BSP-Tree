@@ -33,3 +33,5 @@
 
 .devcontainer
 .github
+.vscode
+main.cpp

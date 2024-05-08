@@ -180,4 +180,4 @@ bool Line::isOrthogonal(const LineSegment& l) const {
     return dotProduct == 0;
 }
 
-#endif // LINE_H
+#endif // LINE_HPP
