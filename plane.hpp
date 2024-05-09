@@ -76,9 +76,8 @@ public:
 
 // Plane
 NType Plane::dist2Point(const Point3D& point) const {
-    Vector3D vectorToPoint = point - p;
-    
-    NType distance = vectorToPoint.dotProduct(n.unit());
+    Vector3D vector(point - p);
+    NType distance = vector.dotProduct(n.unit());
     
     return distance;
 }
@@ -92,17 +91,24 @@ Point3D Plane::intersect(const Line& line) const {
     Point3D p0 = line.getPoint();
 
     NType t = (n.dotProduct(Vector3D(p0 - p))) / n.dotProduct(direction);
+    Point3D intersection = p0 + Point3D(direction.getX() * t, direction.getY() * t, direction.getZ() * t);
+    
+    return intersection;
 }
 
 // Polygon
 Plane Polygon::computePlane() const {
     Vector3D normal;
-    if (vertices.size() >= 3) {
-        Vector3D v1 = vertices[1] - vertices[0];
-        Vector3D v2 = vertices[2] - vertices[0];
+    for (size_t i = 0; i < vertices.size() - 2; ++i) {
+        Vector3D v1(vertices[i] - vertices[i + 1]);
+        Vector3D v2(vertices[i + 1] - vertices[i + 2]);
+
+        if (v1.crossProduct(v2).mag() == NType(0)) {
+            continue;
+        }
+
         normal = v1.crossProduct(v2).unit();
-    } else {
-        throw std::invalid_argument("Polygon must have at least 3 vertices");
+        break;
     }
 
     return Plane(vertices[0], normal);
@@ -113,8 +119,8 @@ bool Polygon::contains(const Point3D& point) const {
     const NType TWO_PI = 6.283185307179586;
 
     for (size_t i = 0; i < vertices.size(); i++) {
-        Vector3D v1 = vertices[i] - point;
-        Vector3D v2 = vertices[(i + 1) % vertices.size()] - point;
+        Vector3D v1(vertices[i] - point);
+        Vector3D v2(vertices[(i + 1) % vertices.size()] - point);
 
         NType d1 = v1.mag();
         NType d2 = v2.mag();
@@ -129,19 +135,12 @@ bool Polygon::contains(const Point3D& point) const {
 }
 
 Point3D Polygon::centroid() const {
-    NType sumX = 0, sumY = 0, sumZ = 0;
-
+    Point3D centroid;
     for (const auto& vertex : vertices) {
-        sumX += vertex.getX();
-        sumY += vertex.getY();
-        sumZ += vertex.getZ();
+        centroid = centroid + vertex;
     }
 
-    NType centroidX = sumX / vertices.size();
-    NType centroidY = sumY / vertices.size();
-    NType centroidZ = sumZ / vertices.size();
-
-    return Point3D(centroidX, centroidY, centroidZ);
+    return centroid / NType(vertices.size());
 }
 
 RelationType Polygon::relationWithPlane(const Plane& plane) const {
@@ -150,9 +149,10 @@ RelationType Polygon::relationWithPlane(const Plane& plane) const {
     
     for (const auto& vertex : vertices) {
         NType distance = plane.dist2Point(vertex);
-        if (distance > 0) {
+
+        if (distance > NType(0)) {
             frontCount++;
-        } else if (distance < 0) {
+        } else if (distance < NType(0)) {
             backCount++;
         }
     }
@@ -179,29 +179,42 @@ std::pair<Polygon, Polygon> Polygon::split(const Plane& plane) const {
         NType currentDistance = plane.dist2Point(current);
         NType nextDistance = plane.dist2Point(next);
 
-        if (currentDistance < 0 && nextDistance < 0) {
+        if (currentDistance < NType(0) && nextDistance < NType(0)) {
             backVertices.push_back(current);
-        } else if (currentDistance > 0 && nextDistance > 0) {
+        } else if (currentDistance > NType(0) && nextDistance > NType(0)) {
             frontVertices.push_back(current);
-        } else {
-            Line line(current, next);
-            Point3D intersection = plane.intersect(line);
-
-            frontVertices.push_back(intersection);
-            backVertices.push_back(intersection);
-
-            if (currentDistance > 0) {
+        } else if (currentDistance == NType(0) || nextDistance == NType(0)) {
+            if (currentDistance > NType(0)) {
                 frontVertices.push_back(current);
             } else {
                 backVertices.push_back(current);
             }
+
+            if (nextDistance > NType(0)) {
+                frontVertices.push_back(next);
+            } else {
+                backVertices.push_back(next);
+            }
+        } else {
+            Point3D intersection = plane.intersect(Line(current, next));
+
+            if (currentDistance > NType(0)) {
+                frontVertices.push_back(current);
+                frontVertices.push_back(intersection);
+
+                backVertices.push_back(intersection);
+                backVertices.push_back(next);
+            } else {
+                backVertices.push_back(current);
+                backVertices.push_back(intersection);
+
+                frontVertices.push_back(intersection);
+                frontVertices.push_back(next);
+            }
         }
     }
 
-    Polygon frontPolygon(frontVertices);
-    Polygon backPolygon(backVertices);
-
-    return std::make_pair(frontPolygon, backPolygon);
+    return std::make_pair(Polygon(frontVertices), Polygon(backVertices));
 }
 
 #endif // PLANE_HPP

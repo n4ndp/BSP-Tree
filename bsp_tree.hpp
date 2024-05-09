@@ -71,17 +71,62 @@ public:
 
 // BSPNode
 void BSPNode::insert(const Polygon& polygon) {
-    // code here
+    RelationType relation = polygon.relationWithPlane(partition);
+    Plane plane = polygon.computePlane();
+
+    if(relation == RelationType::IN_FRONT) {
+        if (front == nullptr) {
+            front = new BSPNode(plane);
+            front->parent = this;
+            front->polygons.push_back(polygon);
+        } else {
+            front->insert(polygon);
+        }
+    } else if(relation == RelationType::BEHIND) {
+        if (back == nullptr) {
+            back = new BSPNode(plane);
+            back->parent = this;
+            back->polygons.push_back(polygon);
+        } else {
+            back->insert(polygon);
+        }
+    } else if(relation == RelationType::COINCIDENT) {
+        polygons.push_back(polygon);
+    } else if(relation == RelationType::SPANNING) {
+        auto [frontPoly, backPoly] = polygon.split(plane);
+
+        if (front == nullptr) {
+            front = new BSPNode(plane);
+            front->parent = this;
+            front ->polygons.push_back(frontPoly);
+        } else {
+            front->insert(frontPoly);
+        }
+
+        if (back == nullptr) {
+            back = new BSPNode(plane);
+            back->parent = this;
+            back->polygons.push_back(backPoly);
+        } else {
+            back->insert(backPoly);
+        }
+    } else {
+        throw std::runtime_error("Invalid relation type");
+    }
 }
 
 const Polygon* BSPNode::detectCollision(const LineSegment& traceLine) const {
-    // code here
-    return nullptr;
+    
 }
 
 // BSPTree
 void BSPTree::insert(const Polygon& polygon) {
-    // code here
+    if (root == nullptr) {
+        root = new BSPNode(polygon.computePlane());
+        root->polygons.push_back(polygon);
+    } else {
+        root->insert(polygon);
+    }
 }
 
 #endif // BSP_HPP
